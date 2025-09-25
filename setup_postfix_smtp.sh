@@ -67,7 +67,7 @@ install_packages() {
     apt-get update -y
     
     # Install Postfix and related packages
-    apt-get install -y postfix mailutils libsasl2-modules libsasl2-2 ca-certificates
+    apt-get install -y postfix mailutils libsasl2-modules libsasl2-2 ca-certificates openssl certbot
     
     print_success "Packages installed successfully"
 }
@@ -148,6 +148,77 @@ smtp_tls_protocols = !SSLv2, !SSLv3
 EOF
 
     print_success "Gmail configuration added"
+}
+
+# Function to configure SSL/TLS certificates
+configure_ssl() {
+    print_status "Configuring SSL/TLS certificates..."
+    
+    # Create SSL directory
+    mkdir -p /etc/postfix/ssl
+    
+    # Check if Let's Encrypt certificate exists
+    if [ -d "/etc/letsencrypt/live/$DOMAIN_NAME" ]; then
+        print_status "Using existing Let's Encrypt certificate..."
+        SSL_CERT="/etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem"
+        SSL_KEY="/etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem"
+    else
+        print_status "Generating self-signed certificate..."
+        
+        # Generate self-signed certificate
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+            -keyout /etc/postfix/ssl/mail.key \
+            -out /etc/postfix/ssl/mail.crt \
+            -subj "/C=US/ST=State/L=City/O=Organization/CN=$DOMAIN_NAME"
+        
+        SSL_CERT="/etc/postfix/ssl/mail.crt"
+        SSL_KEY="/etc/postfix/ssl/mail.key"
+        
+        # Set proper permissions
+        chmod 600 /etc/postfix/ssl/mail.key
+        chmod 644 /etc/postfix/ssl/mail.crt
+        chown root:root /etc/postfix/ssl/*
+    fi
+    
+    # Update Postfix configuration for SSL/TLS
+    cat >> /etc/postfix/main.cf << EOF
+
+# SSL/TLS configuration
+smtpd_use_tls = yes
+smtpd_tls_cert_file = $SSL_CERT
+smtpd_tls_key_file = $SSL_KEY
+smtpd_tls_security_level = may
+smtpd_tls_auth_only = no
+smtpd_tls_loglevel = 1
+smtpd_tls_received_header = yes
+smtpd_tls_session_cache_timeout = 3600s
+tls_random_source = dev:/dev/urandom
+
+# TLS protocols and ciphers
+smtpd_tls_protocols = !SSLv2, !SSLv3, !TLSv1, !TLSv1.1
+smtpd_tls_ciphers = high
+smtpd_tls_mandatory_ciphers = high
+smtpd_tls_mandatory_protocols = !SSLv2, !SSLv3, !TLSv1, !TLSv1.1
+
+# TLS session cache
+smtpd_tls_session_cache_database = btree:\${data_directory}/smtpd_scache
+smtp_tls_session_cache_database = btree:\${data_directory}/smtp_scache
+
+# Client-side TLS
+smtp_use_tls = yes
+smtp_tls_security_level = may
+smtp_tls_loglevel = 1
+smtp_tls_note_starttls_offer = yes
+EOF
+
+    print_success "SSL/TLS configuration completed"
+    
+    if [ ! -d "/etc/letsencrypt/live/$DOMAIN_NAME" ]; then
+        print_warning "Self-signed certificate generated. For production use, consider:"
+        echo "1. Get a Let's Encrypt certificate: certbot certonly --standalone -d $DOMAIN_NAME"
+        echo "2. Or use a commercial SSL certificate"
+        echo "3. Update the certificate paths in /etc/postfix/main.cf"
+    fi
 }
 
 # Function to configure anti-spam measures
@@ -274,8 +345,10 @@ echo "Test message" | mail -s "Test Subject" recipient@example.com
 - Postfix is configured to only listen on loopback interface
 - SASL authentication is required for sending emails
 - TLS encryption is enabled for secure transmission
+- SSL/TLS certificates are configured for secure connections
 - DKIM signing is configured to prevent spam
 - OpenDKIM service is running for email authentication
+- Strong TLS protocols (TLSv1.2+) and ciphers are enforced
 
 ## Anti-Spam Configuration
 The script configures DKIM signing to prevent emails from going to spam. After running the script, you need to add these DNS records:
@@ -299,6 +372,25 @@ v=DMARC1; p=quarantine; rua=mailto:dmarc@yourdomain.com
 
 ### 4. Reverse DNS (PTR)
 Set up reverse DNS for your server IP to point to your hostname.
+
+## SSL/TLS Configuration
+The script automatically configures SSL/TLS for secure email transmission:
+
+### Certificate Options
+1. **Let's Encrypt Certificate** (Recommended for production)
+   - If you have an existing Let's Encrypt certificate, it will be used automatically
+   - To get a new certificate: `certbot certonly --standalone -d yourdomain.com`
+
+2. **Self-Signed Certificate** (For testing)
+   - Generated automatically if no Let's Encrypt certificate exists
+   - Located in `/etc/postfix/ssl/`
+   - Not trusted by email clients but enables encryption
+
+### SSL Features
+- **TLS 1.2+ only** - Disables weak protocols (SSLv2, SSLv3, TLSv1, TLSv1.1)
+- **Strong ciphers** - Uses high-grade encryption ciphers
+- **Session caching** - Improves performance with TLS session reuse
+- **Perfect Forward Secrecy** - Ensures past communications remain secure
 
 ## Troubleshooting
 - Check Postfix logs: \`tail -f /var/log/mail.log\`
@@ -327,6 +419,7 @@ main() {
     configure_postfix
     configure_sasl
     configure_gmail
+    configure_ssl
     configure_anti_spam
     start_postfix
     test_email
@@ -336,8 +429,9 @@ main() {
     print_status "Next steps:"
     echo "1. Check your email for the test message"
     echo "2. Add the DNS records shown above to prevent spam"
-    echo "3. Review the documentation at /root/postfix_setup_guide.md"
-    echo "4. Your SMTP server is ready to send emails"
+    echo "3. For production, get a Let's Encrypt SSL certificate"
+    echo "4. Review the documentation at /root/postfix_setup_guide.md"
+    echo "5. Your secure SMTP server is ready to send emails"
     
     print_warning "Important: Make sure to use strong passwords and enable 2FA on your email account!"
 }

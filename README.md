@@ -6,6 +6,7 @@ A comprehensive shell script to set up Postfix SMTP server with anti-spam measur
 
 This script automates the complete setup of a Postfix SMTP server with:
 - SASL authentication for secure email sending
+- SSL/TLS certificates for encrypted connections
 - DKIM signing to prevent emails from going to spam
 - TLS encryption for secure transmission
 - Anti-spam configuration with SPF, DKIM, and DMARC support
@@ -25,7 +26,9 @@ This script automates the complete setup of a Postfix SMTP server with:
 
 ✅ **Security Hardening**
 - SASL authentication required
+- SSL/TLS certificates configured
 - TLS encryption enabled
+- Strong TLS protocols (TLSv1.2+) enforced
 - Proper file permissions
 - Loopback-only interface binding
 
@@ -94,6 +97,33 @@ Value: v=DMARC1; p=quarantine; rua=mailto:dmarc@yourdomain.com
 
 ### 4. Reverse DNS (PTR)
 Contact your hosting provider to set up reverse DNS for your server IP pointing to your hostname.
+
+## SSL/TLS Configuration
+
+The script automatically configures SSL/TLS for secure email transmission:
+
+### Certificate Options
+
+1. **Let's Encrypt Certificate** (Recommended for production)
+   ```bash
+   # Get a Let's Encrypt certificate
+   certbot certonly --standalone -d yourdomain.com
+   ```
+   - If you have an existing Let's Encrypt certificate, it will be used automatically
+   - Free and trusted by all email clients
+   - Auto-renewal available
+
+2. **Self-Signed Certificate** (For testing)
+   - Generated automatically if no Let's Encrypt certificate exists
+   - Located in `/etc/postfix/ssl/`
+   - Not trusted by email clients but enables encryption
+   - Good for development and testing
+
+### SSL Features
+- **TLS 1.2+ only** - Disables weak protocols (SSLv2, SSLv3, TLSv1, TLSv1.1)
+- **Strong ciphers** - Uses high-grade encryption ciphers
+- **Session caching** - Improves performance with TLS session reuse
+- **Perfect Forward Secrecy** - Ensures past communications remain secure
 
 ## Usage Examples
 
@@ -171,7 +201,10 @@ After installation, the following files are created/modified:
 /etc/postfix/
 ├── main.cf              # Main Postfix configuration
 ├── sasl_passwd          # SMTP authentication credentials
-└── sasl_passwd.db       # Hashed authentication database
+├── sasl_passwd.db       # Hashed authentication database
+└── ssl/                 # SSL/TLS certificates
+    ├── mail.crt         # Self-signed certificate (if used)
+    └── mail.key         # Private key (if used)
 
 /etc/opendkim/
 ├── opendkim.conf        # OpenDKIM configuration
@@ -179,6 +212,11 @@ After installation, the following files are created/modified:
     ├── mail.private     # DKIM private key
     ├── mail.txt         # DKIM public key for DNS
     └── mail.dns         # DNS record format
+
+/etc/letsencrypt/live/   # Let's Encrypt certificates (if used)
+└── yourdomain.com/
+    ├── fullchain.pem    # Full certificate chain
+    └── privkey.pem      # Private key
 
 /root/
 └── postfix_setup_guide.md  # Detailed documentation
@@ -227,6 +265,12 @@ opendkim-testkey -d yourdomain.com -s mail -vvv
    - Verify DKIM key permissions: `ls -la /etc/opendkim/keys/`
    - Test DKIM configuration: `opendkim-testkey -d yourdomain.com -s mail`
 
+4. **SSL/TLS issues:**
+   - Check certificate files exist: `ls -la /etc/postfix/ssl/` or `/etc/letsencrypt/live/yourdomain.com/`
+   - Verify certificate permissions: `ls -la /etc/postfix/ssl/mail.key` (should be 600)
+   - Test SSL configuration: `openssl s_client -connect yourdomain.com:25 -starttls smtp`
+   - Check TLS logs: `grep -i tls /var/log/mail.log`
+
 ## Security Considerations
 
 - **Use strong passwords** for your email account
@@ -234,6 +278,8 @@ opendkim-testkey -d yourdomain.com -s mail -vvv
 - **Regularly rotate** email passwords
 - **Monitor email logs** for suspicious activity
 - **Use App Passwords** for Gmail accounts with 2FA
+- **Use Let's Encrypt certificates** for production (not self-signed)
+- **Keep SSL certificates updated** and monitor expiration
 - **Consider dedicated email service** for production use
 
 ## Email Provider Support
