@@ -211,8 +211,8 @@ echo "Test message" | mail -s "Test Subject" recipient@example.com
 - Check service status: \`systemctl status postfix\`
 
 ## Important Security Considerations
-1. Use App Passwords for Gmail (not your main password)
-2. Enable 2FA on your email account
+1. Use strong, unique passwords for your email account
+2. Enable 2FA on your email account if available
 3. Regularly rotate email passwords
 4. Monitor email logs for suspicious activity
 5. Consider using a dedicated email service for production
@@ -241,7 +241,7 @@ main() {
     echo "2. Review the documentation at /root/postfix_setup_guide.md"
     echo "3. Your SMTP server is ready to send emails"
     
-    print_warning "Important: Make sure to use App Passwords for Gmail accounts with 2FA enabled!"
+    print_warning "Important: Make sure to use strong passwords and enable 2FA on your email account!"
 }
 
 # Run main function
