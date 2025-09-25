@@ -150,6 +150,77 @@ EOF
     print_success "Gmail configuration added"
 }
 
+# Function to configure anti-spam measures
+configure_anti_spam() {
+    print_status "Configuring anti-spam measures..."
+    
+    # Install additional packages for DKIM
+    apt-get install -y opendkim opendkim-tools
+    
+    # Configure OpenDKIM
+    cat > /etc/opendkim.conf << EOF
+# OpenDKIM configuration
+Domain                  *
+Selector                mail
+KeyFile                 /etc/opendkim/keys/mail.private
+Canonicalization        relaxed/simple
+Mode                    sv
+SubDomains              no
+AutoRestart             yes
+AutoRestartRate         10/1M
+Background              yes
+DNSTimeout              5
+SignatureAlgorithm      rsa-sha256
+EOF
+
+    # Create DKIM directory and generate keys
+    mkdir -p /etc/opendkim/keys
+    cd /etc/opendkim/keys
+    
+    # Generate DKIM key
+    opendkim-genkey -s mail -d $DOMAIN_NAME
+    chown opendkim:opendkim mail.private
+    chmod 600 mail.private
+    
+    # Update Postfix configuration for DKIM
+    cat >> /etc/postfix/main.cf << EOF
+
+# DKIM configuration
+milter_protocol = 2
+milter_default_action = accept
+smtpd_milters = inet:localhost:8891
+non_smtpd_milters = inet:localhost:8891
+EOF
+
+    # Configure OpenDKIM socket
+    echo "Socket inet:8891@localhost" >> /etc/opendkim.conf
+    
+    # Start and enable OpenDKIM
+    systemctl start opendkim
+    systemctl enable opendkim
+    
+    # Get DKIM public key for DNS
+    DKIM_PUBLIC_KEY=$(cat /etc/opendkim/keys/mail.txt | grep -o '"[^"]*"' | tr -d '"')
+    
+    print_success "Anti-spam measures configured"
+    print_warning "IMPORTANT: Add these DNS records to prevent spam:"
+    echo ""
+    echo "1. SPF Record (TXT):"
+    echo "   v=spf1 include:_spf.google.com ~all"
+    echo ""
+    echo "2. DKIM Record (TXT):"
+    echo "   mail._domainkey.$DOMAIN_NAME"
+    echo "   $DKIM_PUBLIC_KEY"
+    echo ""
+    echo "3. DMARC Record (TXT):"
+    echo "   _dmarc.$DOMAIN_NAME"
+    echo "   v=DMARC1; p=quarantine; rua=mailto:dmarc@$DOMAIN_NAME"
+    echo ""
+    echo "4. Reverse DNS (PTR):"
+    echo "   Set up reverse DNS for your server IP to point to $HOSTNAME"
+    echo ""
+}
+
 
 # Function to start and enable Postfix
 start_postfix() {
@@ -203,6 +274,31 @@ echo "Test message" | mail -s "Test Subject" recipient@example.com
 - Postfix is configured to only listen on loopback interface
 - SASL authentication is required for sending emails
 - TLS encryption is enabled for secure transmission
+- DKIM signing is configured to prevent spam
+- OpenDKIM service is running for email authentication
+
+## Anti-Spam Configuration
+The script configures DKIM signing to prevent emails from going to spam. After running the script, you need to add these DNS records:
+
+### 1. SPF Record (TXT)
+\`\`\`
+v=spf1 include:_spf.google.com ~all
+\`\`\`
+
+### 2. DKIM Record (TXT)
+\`\`\`
+mail._domainkey.yourdomain.com
+[Generated DKIM public key will be shown after script completion]
+\`\`\`
+
+### 3. DMARC Record (TXT)
+\`\`\`
+_dmarc.yourdomain.com
+v=DMARC1; p=quarantine; rua=mailto:dmarc@yourdomain.com
+\`\`\`
+
+### 4. Reverse DNS (PTR)
+Set up reverse DNS for your server IP to point to your hostname.
 
 ## Troubleshooting
 - Check Postfix logs: \`tail -f /var/log/mail.log\`
@@ -231,6 +327,7 @@ main() {
     configure_postfix
     configure_sasl
     configure_gmail
+    configure_anti_spam
     start_postfix
     test_email
     create_documentation
@@ -238,8 +335,9 @@ main() {
     print_success "Postfix SMTP setup completed successfully!"
     print_status "Next steps:"
     echo "1. Check your email for the test message"
-    echo "2. Review the documentation at /root/postfix_setup_guide.md"
-    echo "3. Your SMTP server is ready to send emails"
+    echo "2. Add the DNS records shown above to prevent spam"
+    echo "3. Review the documentation at /root/postfix_setup_guide.md"
+    echo "4. Your SMTP server is ready to send emails"
     
     print_warning "Important: Make sure to use strong passwords and enable 2FA on your email account!"
 }
