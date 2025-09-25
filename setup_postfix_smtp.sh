@@ -76,8 +76,10 @@ install_packages() {
 configure_postfix() {
     print_status "Configuring Postfix..."
     
-    # Backup original configuration
-    cp /etc/postfix/main.cf /etc/postfix/main.cf.backup
+    # Backup original configuration (if it exists)
+    if [ -f "/etc/postfix/main.cf" ]; then
+        cp /etc/postfix/main.cf /etc/postfix/main.cf.backup
+    fi
     
     # Configure main.cf
     cat > /etc/postfix/main.cf << EOF
@@ -228,6 +230,12 @@ configure_anti_spam() {
     # Install additional packages for DKIM
     apt-get install -y opendkim opendkim-tools
     
+    # Check if installation was successful
+    if ! command -v opendkim-genkey >/dev/null 2>&1; then
+        print_error "Failed to install OpenDKIM. Please check your package manager."
+        exit 1
+    fi
+    
     # Configure OpenDKIM
     cat > /etc/opendkim.conf << EOF
 # OpenDKIM configuration
@@ -249,9 +257,17 @@ EOF
     cd /etc/opendkim/keys
     
     # Generate DKIM key
-    opendkim-genkey -s mail -d $DOMAIN_NAME
-    chown opendkim:opendkim mail.private
-    chmod 600 mail.private
+    if opendkim-genkey -s mail -d $DOMAIN_NAME; then
+        chown opendkim:opendkim mail.private
+        chmod 600 mail.private
+        print_success "DKIM key generated successfully"
+    else
+        print_error "Failed to generate DKIM key"
+        exit 1
+    fi
+    
+    # Return to original directory
+    cd - > /dev/null
     
     # Update Postfix configuration for DKIM
     cat >> /etc/postfix/main.cf << EOF
@@ -270,8 +286,18 @@ EOF
     systemctl start opendkim
     systemctl enable opendkim
     
+    # Check if OpenDKIM started successfully
+    if ! systemctl is-active --quiet opendkim; then
+        print_error "Failed to start OpenDKIM service"
+        exit 1
+    fi
+    
     # Get DKIM public key for DNS
-    DKIM_PUBLIC_KEY=$(cat /etc/opendkim/keys/mail.txt | grep -o '"[^"]*"' | tr -d '"')
+    if [ -f "/etc/opendkim/keys/mail.txt" ]; then
+        DKIM_PUBLIC_KEY=$(cat /etc/opendkim/keys/mail.txt | grep -o '"[^"]*"' | tr -d '"')
+    else
+        DKIM_PUBLIC_KEY="[DKIM key not found - check /etc/opendkim/keys/mail.txt]"
+    fi
     
     print_success "Anti-spam measures configured"
     print_warning "IMPORTANT: Add these DNS records to prevent spam:"
@@ -297,14 +323,22 @@ EOF
 start_postfix() {
     print_status "Starting Postfix service..."
     
-    # Reload configuration
-    postfix reload
+    # Reload configuration (if Postfix is already running)
+    if systemctl is-active --quiet postfix; then
+        postfix reload
+    fi
     
     # Start and enable Postfix
     systemctl start postfix
     systemctl enable postfix
     
-    print_success "Postfix service started and enabled"
+    # Check if Postfix started successfully
+    if systemctl is-active --quiet postfix; then
+        print_success "Postfix service started and enabled"
+    else
+        print_error "Failed to start Postfix service"
+        exit 1
+    fi
 }
 
 # Function to test email functionality
@@ -312,7 +346,12 @@ test_email() {
     print_status "Testing email functionality..."
     
     # Create a test email
-    echo "This is a test email from Postfix SMTP setup." | mail -s "Postfix SMTP Test" $EMAIL_USER
+    if command -v mail >/dev/null 2>&1; then
+        echo "This is a test email from Postfix SMTP setup." | mail -s "Postfix SMTP Test" $EMAIL_USER
+    else
+        print_warning "Mail command not found. Skipping test email."
+        return 0
+    fi
     
     print_success "Test email sent to $EMAIL_USER"
     print_warning "Check your email inbox to verify the setup is working"
