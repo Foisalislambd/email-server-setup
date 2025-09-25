@@ -197,46 +197,6 @@ This setup configures Postfix to send verification codes and password reset emai
 echo "Test message" | mail -s "Test Subject" recipient@example.com
 \`\`\`
 
-## Integration with Your Website
-
-### PHP Integration
-\`\`\`php
-<?php
-function sendVerificationCode(\$email, \$code) {
-    \$subject = "Email Verification Code";
-    \$message = "Your verification code is: \$code";
-    \$headers = "From: noreply@" . gethostname();
-    
-    return mail(\$email, \$subject, \$message, \$headers);
-}
-
-function sendPasswordReset(\$email, \$code) {
-    \$subject = "Password Reset Code";
-    \$message = "Your password reset code is: \$code";
-    \$headers = "From: noreply@" . gethostname();
-    
-    return mail(\$email, \$subject, \$message, \$headers);
-}
-?>
-\`\`\`
-
-### Node.js Integration
-\`\`\`javascript
-const { exec } = require('child_process');
-
-function sendVerificationCode(email, code) {
-    return new Promise((resolve, reject) => {
-        const command = \`echo "Your verification code is: \${code}" | mail -s "Email Verification Code" \${email}\`;
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                reject(error);
-            } else {
-                resolve(stdout);
-            }
-        });
-    });
-}
-\`\`\`
 
 ## Security Notes
 - Email passwords are stored in /etc/postfix/sasl_passwd (chmod 600)
@@ -279,8 +239,7 @@ main() {
     print_status "Next steps:"
     echo "1. Check your email for the test message"
     echo "2. Review the documentation at /root/postfix_setup_guide.md"
-    echo "3. Integrate the email functions into your website"
-    echo "4. Test with your actual verification and password reset flows"
+    echo "3. Your SMTP server is ready to send emails"
     
     print_warning "Important: Make sure to use App Passwords for Gmail accounts with 2FA enabled!"
 }
