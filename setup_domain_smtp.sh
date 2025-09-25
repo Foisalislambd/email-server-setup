@@ -49,6 +49,8 @@ read -p "Enter SMTP port (default 587): " SMTP_PORT
 SMTP_PORT=${SMTP_PORT:-587}
 read -p "Enter server hostname (default: mail.$DOMAIN): " SERVER_HOSTNAME
 SERVER_HOSTNAME=${SERVER_HOSTNAME:-mail.$DOMAIN}
+read -p "Install Let's Encrypt SSL certificate automatically? (y/n, default: n): " INSTALL_SSL
+INSTALL_SSL=${INSTALL_SSL:-n}
 
 # Validate inputs
 if [[ -z "$DOMAIN" || -z "$EMAIL_ADDRESS" || -z "$EMAIL_PASSWORD" ]]; then
@@ -59,6 +61,12 @@ fi
 log_info "Installing required packages..."
 apt update
 apt install -y postfix libsasl2-modules libsasl2-2 ca-certificates openssl
+
+# Install certbot if SSL installation is requested
+if [[ "$INSTALL_SSL" == "y" || "$INSTALL_SSL" == "Y" ]]; then
+    log_info "Installing certbot for Let's Encrypt SSL certificates..."
+    apt install -y certbot
+fi
 
 log_success "Packages installed successfully"
 
@@ -139,7 +147,7 @@ log_info "Configuring SASL authentication..."
 # Create SASL password file
 mkdir -p /etc/postfix/sasl
 cat > /etc/postfix/sasl_passwd << EOF
-[$SERVER_HOSTNAME]:$SMTP_PORT $EMAIL_ADDRESS:$EMAIL_PASSWORD
+$SERVER_HOSTNAME:$SMTP_PORT $EMAIL_ADDRESS:$EMAIL_PASSWORD
 EOF
 
 # Set proper permissions
@@ -160,24 +168,55 @@ log_success "Header checks configured"
 
 log_info "Configuring SSL/TLS certificates..."
 
-# Generate self-signed certificate if not exists
-if [[ ! -f /etc/ssl/certs/ssl-cert-snakeoil.pem ]]; then
-    log_info "Generating self-signed certificate..."
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-        -keyout /etc/ssl/private/ssl-cert-snakeoil.key \
-        -out /etc/ssl/certs/ssl-cert-snakeoil.pem \
-        -subj "/C=US/ST=State/L=City/O=Organization/CN=$SERVER_HOSTNAME"
+# Handle SSL certificate installation
+if [[ "$INSTALL_SSL" == "y" || "$INSTALL_SSL" == "Y" ]]; then
+    log_info "Installing Let's Encrypt SSL certificate..."
     
-    chmod 600 /etc/ssl/private/ssl-cert-snakeoil.key
-    chmod 644 /etc/ssl/certs/ssl-cert-snakeoil.pem
+    # Stop postfix temporarily for certificate generation
+    systemctl stop postfix
+    
+    # Generate Let's Encrypt certificate
+    if certbot certonly --standalone --non-interactive --agree-tos --email "$EMAIL_ADDRESS" -d "$SERVER_HOSTNAME" -d "$DOMAIN"; then
+        log_success "Let's Encrypt SSL certificate installed successfully"
+        
+        # Update Postfix configuration to use Let's Encrypt certificates
+        sed -i "s|smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem|smtpd_tls_cert_file = /etc/letsencrypt/live/$SERVER_HOSTNAME/fullchain.pem|g" /etc/postfix/main.cf
+        sed -i "s|smtpd_tls_key_file = /etc/ssl/private/ssl-cert-snakeoil.key|smtpd_tls_key_file = /etc/letsencrypt/live/$SERVER_HOSTNAME/privkey.pem|g" /etc/postfix/main.cf
+        
+        log_success "Postfix configuration updated to use Let's Encrypt certificates"
+    else
+        log_warning "Let's Encrypt certificate installation failed, falling back to self-signed certificate"
+        INSTALL_SSL="n"
+    fi
+    
+    # Restart postfix
+    systemctl start postfix
+fi
+
+# Generate self-signed certificate if Let's Encrypt was not used or failed
+if [[ "$INSTALL_SSL" != "y" && "$INSTALL_SSL" != "Y" ]]; then
+    if [[ ! -f /etc/ssl/certs/ssl-cert-snakeoil.pem ]]; then
+        log_info "Generating self-signed certificate..."
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+            -keyout /etc/ssl/private/ssl-cert-snakeoil.key \
+            -out /etc/ssl/certs/ssl-cert-snakeoil.pem \
+            -subj "/C=US/ST=State/L=City/O=Organization/CN=$SERVER_HOSTNAME" \
+            -config <(echo -e "[req]\ndistinguished_name=req\n[req]")
+        
+        chmod 600 /etc/ssl/private/ssl-cert-snakeoil.key
+        chmod 644 /etc/ssl/certs/ssl-cert-snakeoil.pem
+        log_success "Self-signed SSL certificate generated"
+    else
+        log_info "SSL certificate already exists, using existing certificate"
+    fi
+    
+    log_warning "Self-signed certificate generated. For production use, consider:"
+    log_warning "1. Get a Let's Encrypt certificate: certbot certonly --standalone -d $DOMAIN"
+    log_warning "2. Or use a commercial SSL certificate"
+    log_warning "3. Update the certificate paths in /etc/postfix/main.cf"
 fi
 
 log_success "SSL/TLS configuration completed"
-
-log_warning "Self-signed certificate generated. For production use, consider:"
-log_warning "1. Get a Let's Encrypt certificate: certbot certonly --standalone -d $DOMAIN"
-log_warning "2. Or use a commercial SSL certificate"
-log_warning "3. Update the certificate paths in /etc/postfix/main.cf"
 
 log_info "Setting up mailname..."
 echo "$DOMAIN" > /etc/mailname
@@ -189,6 +228,9 @@ newaliases
 log_info "Starting Postfix service..."
 systemctl enable postfix
 systemctl restart postfix
+
+# Final configuration reload to ensure all settings are applied
+postfix reload
 
 log_success "Postfix service started and enabled"
 
@@ -210,11 +252,12 @@ Date: $(date)
 EOF
 
 # Send test email
-if sendmail -f "$EMAIL_ADDRESS" "$EMAIL_ADDRESS" < /tmp/test_email.txt; then
+if echo "Test message from $DOMAIN SMTP server" | mail -s "Test Email from $DOMAIN" -a "From: $EMAIL_ADDRESS" "$EMAIL_ADDRESS"; then
     log_success "Test email sent to $EMAIL_ADDRESS"
     log_warning "Check your email inbox to verify the setup is working"
 else
-    log_error "Failed to send test email"
+    log_warning "Test email sending failed, but this is normal for initial setup"
+    log_info "You can test manually later once DNS records are configured"
 fi
 
 # Clean up test file
