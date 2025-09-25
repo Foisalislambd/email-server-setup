@@ -150,179 +150,6 @@ EOF
     print_success "Gmail configuration added"
 }
 
-# Function to create email templates directory
-create_templates() {
-    print_status "Creating email templates directory..."
-    
-    mkdir -p /opt/email-templates
-    
-    # Create verification email template
-    cat > /opt/email-templates/verification.html << 'EOF'
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Email Verification</title>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background-color: #f4f4f4; padding: 20px; text-align: center; }
-        .content { padding: 20px; }
-        .verification-code { 
-            background-color: #007bff; 
-            color: white; 
-            padding: 15px; 
-            text-align: center; 
-            font-size: 24px; 
-            font-weight: bold; 
-            margin: 20px 0; 
-            border-radius: 5px; 
-        }
-        .footer { background-color: #f4f4f4; padding: 10px; text-align: center; font-size: 12px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Email Verification</h1>
-        </div>
-        <div class="content">
-            <p>Hello,</p>
-            <p>Thank you for registering with us. Please use the following verification code to complete your registration:</p>
-            <div class="verification-code">VERIFICATION_CODE</div>
-            <p>This code will expire in 15 minutes.</p>
-            <p>If you did not request this verification, please ignore this email.</p>
-        </div>
-        <div class="footer">
-            <p>This is an automated message. Please do not reply to this email.</p>
-        </div>
-    </div>
-</body>
-</html>
-EOF
-
-    # Create password reset email template
-    cat > /opt/email-templates/password-reset.html << 'EOF'
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Password Reset</title>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background-color: #f4f4f4; padding: 20px; text-align: center; }
-        .content { padding: 20px; }
-        .reset-code { 
-            background-color: #dc3545; 
-            color: white; 
-            padding: 15px; 
-            text-align: center; 
-            font-size: 24px; 
-            font-weight: bold; 
-            margin: 20px 0; 
-            border-radius: 5px; 
-        }
-        .footer { background-color: #f4f4f4; padding: 10px; text-align: center; font-size: 12px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Password Reset Request</h1>
-        </div>
-        <div class="content">
-            <p>Hello,</p>
-            <p>We received a request to reset your password. Please use the following reset code:</p>
-            <div class="reset-code">RESET_CODE</div>
-            <p>This code will expire in 30 minutes.</p>
-            <p>If you did not request a password reset, please ignore this email and your password will remain unchanged.</p>
-        </div>
-        <div class="footer">
-            <p>This is an automated message. Please do not reply to this email.</p>
-        </div>
-    </div>
-</body>
-</html>
-EOF
-
-    # Create PHP script for sending emails
-    cat > /opt/email-templates/send_email.php << 'EOF'
-<?php
-/**
- * Email sending function for verification codes and password resets
- * Usage: php send_email.php recipient@example.com verification 123456
- */
-
-function sendEmail($to, $type, $code) {
-    $templates = [
-        'verification' => [
-            'subject' => 'Email Verification Code',
-            'template' => '/opt/email-templates/verification.html'
-        ],
-        'password-reset' => [
-            'subject' => 'Password Reset Code',
-            'template' => '/opt/email-templates/password-reset.html'
-        ]
-    ];
-    
-    if (!isset($templates[$type])) {
-        throw new Exception("Invalid email type: $type");
-    }
-    
-    $config = $templates[$type];
-    $subject = $config['subject'];
-    $template = file_get_contents($config['template']);
-    
-    // Replace placeholders
-    $body = str_replace(['VERIFICATION_CODE', 'RESET_CODE'], $code, $template);
-    
-    // Email headers
-    $headers = [
-        'MIME-Version: 1.0',
-        'Content-type: text/html; charset=UTF-8',
-        'From: noreply@' . gethostname(),
-        'Reply-To: noreply@' . gethostname(),
-        'X-Mailer: PHP/' . phpversion()
-    ];
-    
-    // Send email using mail() function
-    $result = mail($to, $subject, $body, implode("\r\n", $headers));
-    
-    if ($result) {
-        echo "Email sent successfully to $to\n";
-        return true;
-    } else {
-        echo "Failed to send email to $to\n";
-        return false;
-    }
-}
-
-// Command line usage
-if ($argc < 4) {
-    echo "Usage: php send_email.php <recipient> <type> <code>\n";
-    echo "Types: verification, password-reset\n";
-    exit(1);
-}
-
-$recipient = $argv[1];
-$type = $argv[2];
-$code = $argv[3];
-
-try {
-    sendEmail($recipient, $type, $code);
-} catch (Exception $e) {
-    echo "Error: " . $e->getMessage() . "\n";
-    exit(1);
-}
-?>
-EOF
-
-    chmod +x /opt/email-templates/send_email.php
-    chown -R www-data:www-data /opt/email-templates
-    
-    print_success "Email templates created in /opt/email-templates/"
-}
 
 # Function to start and enable Postfix
 start_postfix() {
@@ -353,7 +180,7 @@ test_email() {
 create_documentation() {
     print_status "Creating usage documentation..."
     
-    cat > /opt/email-templates/README.md << EOF
+    cat > /root/postfix_setup_guide.md << EOF
 # Postfix SMTP Email Setup
 
 ## Overview
@@ -362,19 +189,8 @@ This setup configures Postfix to send verification codes and password reset emai
 ## Configuration Files
 - Main config: /etc/postfix/main.cf
 - SASL auth: /etc/postfix/sasl_passwd
-- Templates: /opt/email-templates/
 
 ## Usage Examples
-
-### Send Verification Email
-\`\`\`bash
-php /opt/email-templates/send_email.php user@example.com verification 123456
-\`\`\`
-
-### Send Password Reset Email
-\`\`\`bash
-php /opt/email-templates/send_email.php user@example.com password-reset 789012
-\`\`\`
 
 ### Test Basic Email
 \`\`\`bash
@@ -387,15 +203,19 @@ echo "Test message" | mail -s "Test Subject" recipient@example.com
 \`\`\`php
 <?php
 function sendVerificationCode(\$email, \$code) {
-    \$command = "php /opt/email-templates/send_email.php \$email verification \$code";
-    exec(\$command, \$output, \$return_code);
-    return \$return_code === 0;
+    \$subject = "Email Verification Code";
+    \$message = "Your verification code is: \$code";
+    \$headers = "From: noreply@" . gethostname();
+    
+    return mail(\$email, \$subject, \$message, \$headers);
 }
 
 function sendPasswordReset(\$email, \$code) {
-    \$command = "php /opt/email-templates/send_email.php \$email password-reset \$code";
-    exec(\$command, \$output, \$return_code);
-    return \$return_code === 0;
+    \$subject = "Password Reset Code";
+    \$message = "Your password reset code is: \$code";
+    \$headers = "From: noreply@" . gethostname();
+    
+    return mail(\$email, \$subject, \$message, \$headers);
 }
 ?>
 \`\`\`
@@ -406,7 +226,8 @@ const { exec } = require('child_process');
 
 function sendVerificationCode(email, code) {
     return new Promise((resolve, reject) => {
-        exec(\`php /opt/email-templates/send_email.php \${email} verification \${code}\`, (error, stdout, stderr) => {
+        const command = \`echo "Your verification code is: \${code}" | mail -s "Email Verification Code" \${email}\`;
+        exec(command, (error, stdout, stderr) => {
             if (error) {
                 reject(error);
             } else {
@@ -437,7 +258,7 @@ function sendVerificationCode(email, code) {
 5. Consider using a dedicated email service for production
 EOF
 
-    print_success "Documentation created at /opt/email-templates/README.md"
+    print_success "Documentation created at /root/postfix_setup_guide.md"
 }
 
 # Main execution
@@ -450,7 +271,6 @@ main() {
     configure_postfix
     configure_sasl
     configure_gmail
-    create_templates
     start_postfix
     test_email
     create_documentation
@@ -458,7 +278,7 @@ main() {
     print_success "Postfix SMTP setup completed successfully!"
     print_status "Next steps:"
     echo "1. Check your email for the test message"
-    echo "2. Review the documentation at /opt/email-templates/README.md"
+    echo "2. Review the documentation at /root/postfix_setup_guide.md"
     echo "3. Integrate the email functions into your website"
     echo "4. Test with your actual verification and password reset flows"
     
