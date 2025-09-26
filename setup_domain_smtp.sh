@@ -191,7 +191,8 @@ if [[ "$INSTALL_SSL" == "y" || "$INSTALL_SSL" == "Y" ]]; then
         INSTALL_SSL="n"
     fi
     
-    # Restart postfix
+    # Reload systemd daemon and restart postfix
+    systemctl daemon-reload
     systemctl start postfix
 fi
 
@@ -228,13 +229,42 @@ echo "root: $EMAIL_ADDRESS" >> /etc/aliases
 newaliases
 
 log_info "Starting Postfix service..."
+
+# Reload systemd daemon to ensure all service files are recognized
+log_info "Reloading systemd daemon..."
+systemctl daemon-reload
+
+# Enable Postfix service to start automatically on boot
+log_info "Enabling Postfix service for auto-start..."
 systemctl enable postfix
+
+# Start/restart Postfix service
+log_info "Starting Postfix service..."
 systemctl restart postfix
 
 # Final configuration reload to ensure all settings are applied
+log_info "Reloading Postfix configuration..."
 postfix reload
 
-log_success "Postfix service started and enabled"
+log_success "Postfix service started and enabled successfully"
+
+# Verify service status
+log_info "Verifying Postfix service status..."
+if systemctl is-active --quiet postfix; then
+    log_success "Postfix is running and active"
+else
+    log_error "Postfix failed to start properly"
+    log_info "Checking Postfix status..."
+    systemctl status postfix --no-pager
+    exit 1
+fi
+
+# Check if service is enabled
+if systemctl is-enabled --quiet postfix; then
+    log_success "Postfix is enabled for auto-start on boot"
+else
+    log_warning "Postfix is not enabled for auto-start"
+fi
 
 log_info "Testing email functionality..."
 

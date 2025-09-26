@@ -42,8 +42,15 @@ log_info "1. Checking Postfix service status..."
 if systemctl is-active --quiet postfix; then
     log_success "Postfix service is running"
 else
-    log_error "Postfix service is not running"
-    exit 1
+    log_warning "Postfix service is not running, attempting to start..."
+    systemctl daemon-reload
+    systemctl start postfix
+    if systemctl is-active --quiet postfix; then
+        log_success "Postfix service started successfully"
+    else
+        log_error "Failed to start Postfix service"
+        exit 1
+    fi
 fi
 
 # Test 2: Check configuration
