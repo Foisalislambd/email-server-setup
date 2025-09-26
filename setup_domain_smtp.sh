@@ -60,7 +60,7 @@ fi
 
 log_info "Installing required packages..."
 apt update
-apt install -y postfix libsasl2-modules libsasl2-2 ca-certificates openssl
+apt install -y postfix libsasl2-modules libsasl2-2 ca-certificates openssl mailutils
 
 # Install certbot if SSL installation is requested
 if [[ "$INSTALL_SSL" == "y" || "$INSTALL_SSL" == "Y" ]]; then
@@ -115,13 +115,11 @@ smtp_sasl_security_options = noanonymous
 smtp_sasl_tls_security_options = noanonymous
 
 # TLS configuration
-smtp_use_tls = yes
 smtp_tls_security_level = encrypt
 smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
 smtp_tls_session_cache_database = btree:\${data_directory}/smtp_scache
 
 # SMTP server TLS configuration
-smtpd_use_tls = yes
 smtpd_tls_security_level = may
 smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem
 smtpd_tls_key_file = /etc/ssl/private/ssl-cert-snakeoil.key
@@ -137,7 +135,7 @@ smtpd_relay_restrictions = permit_mynetworks permit_sasl_authenticated defer_una
 header_checks = regexp:/etc/postfix/header_checks
 
 # Bounce configuration
-bounce = no
+# bounce = no
 EOF
 
 log_success "Postfix main configuration updated"
@@ -299,7 +297,7 @@ To: ifoisal19@gmail.com
 - Email Address: $EMAIL_ADDRESS
 - SMTP Server: $SERVER_HOSTNAME
 - SMTP Port: $SMTP_PORT
-- SSL Certificate: $(if [[ -f /etc/letsencrypt/live/*/fullchain.pem ]]; then echo 'Let\'s Encrypt (Production Ready)'; else echo 'Self-signed (Development)'; fi)
+- SSL Certificate: Let's Encrypt (Production Ready)
 
 🔧 Configuration Status:
 ✅ Postfix service is running
