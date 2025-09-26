@@ -9,7 +9,8 @@
     "test-simple": "node simple-test.js"
   },
   "dependencies": {
-    "nodemailer": "^6.9.7"
+    "nodemailer": "^6.9.7",
+    "dotenv": "^16.3.1"
   },
   "keywords": ["smtp", "email", "test", "authentication"],
   "author": "Your Name",

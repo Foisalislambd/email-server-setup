@@ -68,24 +68,38 @@ setup_test_files() {
     print_success "Test files set up"
 }
 
+# Function to setup environment file
+setup_env() {
+    print_status "Setting up environment configuration..."
+    
+    if [[ ! -f .env ]]; then
+        cp .env.example .env
+        print_success "Created .env file from .env.example"
+    else
+        print_warning ".env file already exists"
+    fi
+}
+
 # Function to show usage instructions
 show_instructions() {
     print_success "SMTP Test Project installed successfully!"
     echo
     print_status "Next steps:"
     echo
-    echo "1. Set your password in the test files:"
-    echo "   nano test-smtp.js    # Line 15"
-    echo "   nano simple-test.js  # Line 12"
+    echo "1. Configure your environment variables:"
+    echo "   nano .env"
     echo
-    echo "2. Run the tests:"
+    echo "2. Set your password in the .env file:"
+    echo "   SMTP_PASS=your_actual_password_here"
+    echo
+    echo "3. Run the tests:"
     echo "   npm run test-simple  # Quick test"
     echo "   npm run test         # Comprehensive test"
     echo "   npm run test-debug   # Debug mode"
     echo
-    echo "3. Check the README.md for more details"
+    echo "4. Check the README.md for more details"
     echo
-    print_warning "Don't forget to replace 'YOUR_PASSWORD_HERE' with your actual password!"
+    print_warning "Don't forget to set your password in the .env file!"
 }
 
 # Main function
@@ -95,6 +109,7 @@ main() {
     check_nodejs
     install_dependencies
     setup_test_files
+    setup_env
     show_instructions
     
     print_success "Installation complete!"

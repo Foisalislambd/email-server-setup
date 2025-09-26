@@ -9,10 +9,24 @@ This project helps you test SMTP authentication for your mail server at `mail.10
 npm install
 ```
 
-### 2. Set Your Password
-Edit the password in the test files:
-- `test-smtp.js` - Line 15: Replace `YOUR_PASSWORD_HERE`
-- `simple-test.js` - Line 12: Replace `YOUR_PASSWORD_HERE`
+### 2. Configure Environment Variables
+Copy the example environment file and edit it:
+```bash
+cp .env.example .env
+nano .env
+```
+
+Edit the `.env` file with your settings:
+```env
+SMTP_HOST=localhost
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=noreply
+SMTP_PASS=your_actual_password_here
+TEST_EMAIL_TO=your_email@gmail.com
+TEST_EMAIL_FROM=noreply@100to1shot.com
+DEBUG_MODE=true
+```
 
 ### 3. Run Tests
 

@@ -2,33 +2,34 @@
 // SMTP Test Project - Comprehensive Email Testing
 // =============================================================================
 
+require('dotenv').config();
 const nodemailer = require('nodemailer');
 
-// Configuration
+// Configuration from environment variables
 const config = {
     // Try different host options
     hosts: [
-        'localhost',
+        process.env.SMTP_HOST || 'localhost',
         'mail.100to1shot.com',
         '127.0.0.1'
     ],
-    port: 587,
-    secure: false, // true for 465, false for other ports
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === 'true',
     auth: {
-        user: 'noreply',
-        pass: 'YOUR_PASSWORD_HERE' // Replace with your actual password
+        user: process.env.SMTP_USER || 'noreply',
+        pass: process.env.SMTP_PASS || 'YOUR_PASSWORD_HERE'
     },
     tls: {
         rejectUnauthorized: false
     },
-    debug: true,
+    debug: process.env.DEBUG_MODE === 'true' || true,
     logger: true
 };
 
 // Test email configuration
 const testEmail = {
-    from: 'noreply@100to1shot.com',
-    to: 'ifoisal19@gmail.com', // Replace with your test email
+    from: process.env.TEST_EMAIL_FROM || 'noreply@100to1shot.com',
+    to: process.env.TEST_EMAIL_TO || 'ifoisal19@gmail.com',
     subject: 'SMTP Test - ' + new Date().toISOString(),
     text: 'This is a test email from your SMTP server.',
     html: `

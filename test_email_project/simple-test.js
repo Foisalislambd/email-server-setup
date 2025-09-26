@@ -2,24 +2,25 @@
 // Simple SMTP Test - Quick Authentication Test
 // =============================================================================
 
+require('dotenv').config();
 const nodemailer = require('nodemailer');
 
 console.log('🚀 Simple SMTP Test Starting...');
 console.log('=' .repeat(40));
 
-// Simple configuration
+// Simple configuration from environment variables
 const transporter = nodemailer.createTransporter({
-    host: 'localhost', // Try localhost first
-    port: 587,
-    secure: false,
+    host: process.env.SMTP_HOST || 'localhost',
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === 'true',
     auth: {
-        user: 'noreply',
-        pass: 'YOUR_PASSWORD_HERE' // Replace with your actual password
+        user: process.env.SMTP_USER || 'noreply',
+        pass: process.env.SMTP_PASS || 'YOUR_PASSWORD_HERE'
     },
     tls: {
         rejectUnauthorized: false
     },
-    debug: true,
+    debug: process.env.DEBUG_MODE === 'true' || true,
     logger: true
 });
 
@@ -43,8 +44,8 @@ transporter.verify((error, success) => {
         // Send test email
         console.log('📧 Sending test email...');
         const mailOptions = {
-            from: 'noreply@100to1shot.com',
-            to: 'ifoisal19@gmail.com', // Replace with your email
+            from: process.env.TEST_EMAIL_FROM || 'noreply@100to1shot.com',
+            to: process.env.TEST_EMAIL_TO || 'ifoisal19@gmail.com',
             subject: 'Simple SMTP Test',
             text: 'This is a simple test email from your SMTP server.',
             html: '<p>This is a simple test email from your SMTP server.</p>'
