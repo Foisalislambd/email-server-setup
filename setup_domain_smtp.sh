@@ -168,16 +168,18 @@ log_success "Header checks configured"
 
 log_info "Configuring SSL/TLS certificates..."
 
-# Handle SSL certificate installation
+# Handle SSL certificate installation (ONLY for subdomain, NOT main domain)
 if [[ "$INSTALL_SSL" == "y" || "$INSTALL_SSL" == "Y" ]]; then
-    log_info "Installing Let's Encrypt SSL certificate..."
+    log_info "Installing Let's Encrypt SSL certificate for $SERVER_HOSTNAME (subdomain only)..."
     
     # Stop postfix temporarily for certificate generation
     systemctl stop postfix
     
-    # Generate Let's Encrypt certificate
-    if certbot certonly --standalone --non-interactive --agree-tos --email "$EMAIL_ADDRESS" -d "$SERVER_HOSTNAME" -d "$DOMAIN"; then
-        log_success "Let's Encrypt SSL certificate installed successfully"
+    # Generate Let's Encrypt certificate (only for subdomain)
+    log_info "Installing SSL certificate ONLY for: $SERVER_HOSTNAME"
+    log_info "Main domain $DOMAIN will NOT be affected"
+    if certbot certonly --standalone --non-interactive --agree-tos --email "$EMAIL_ADDRESS" -d "$SERVER_HOSTNAME"; then
+        log_success "Let's Encrypt SSL certificate installed successfully for $SERVER_HOSTNAME only"
         
         # Update Postfix configuration to use Let's Encrypt certificates
         sed -i "s|smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem|smtpd_tls_cert_file = /etc/letsencrypt/live/$SERVER_HOSTNAME/fullchain.pem|g" /etc/postfix/main.cf
@@ -211,7 +213,7 @@ if [[ "$INSTALL_SSL" != "y" && "$INSTALL_SSL" != "Y" ]]; then
     fi
     
     log_warning "Self-signed certificate generated. For production use, consider:"
-    log_warning "1. Get a Let's Encrypt certificate: certbot certonly --standalone -d $DOMAIN"
+    log_warning "1. Get a Let's Encrypt certificate: certbot certonly --standalone -d $SERVER_HOSTNAME"
     log_warning "2. Or use a commercial SSL certificate"
     log_warning "3. Update the certificate paths in /etc/postfix/main.cf"
 fi
