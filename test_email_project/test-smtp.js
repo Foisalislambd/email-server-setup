@@ -47,7 +47,7 @@ async function testSMTPConnection(host) {
     console.log(`\n🔍 Testing SMTP connection to: ${host}`);
     console.log('=' .repeat(50));
     
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
         ...config,
         host: host
     });
@@ -101,7 +101,7 @@ async function testAuthMethods(host) {
     for (const auth of authMethods) {
         console.log(`\n🧪 Testing: ${auth.description}`);
         
-        const transporter = nodemailer.createTransporter({
+        const transporter = nodemailer.createTransport({
             ...config,
             host: host,
             auth: {

@@ -9,7 +9,7 @@ console.log('🚀 Simple SMTP Test Starting...');
 console.log('=' .repeat(40));
 
 // Simple configuration from environment variables
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'localhost',
     port: parseInt(process.env.SMTP_PORT) || 587,
     secure: process.env.SMTP_SECURE === 'true',
