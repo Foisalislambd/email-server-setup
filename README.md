@@ -5,6 +5,8 @@ This script automatically sets up a complete Postfix mail server for your subdom
 ## Features
 
 - ✅ **Complete Postfix Configuration**: Automated setup with optimal settings
+- ✅ **SSL/TLS Encryption**: Secure email transmission with certificates
+- ✅ **SASL Authentication**: Secure SMTP authentication for your website
 - ✅ **DKIM Authentication**: Email authentication to prevent spam
 - ✅ **Security Hardening**: Firewall rules and fail2ban protection
 - ✅ **Send-Only Setup**: Optimized for website email sending
@@ -63,13 +65,13 @@ This script automatically sets up a complete Postfix mail server for your subdom
 
 ## SMTP Configuration for Your Website
 
-After running the script, use these settings in your website:
+After running the script, use these secure settings in your website:
 
 ```
 Host: mail.100to1shot.com
-Port: 25
-Security: None
-Authentication: None
+Port: 587 (STARTTLS) or 465 (SSL/TLS)
+Security: STARTTLS or SSL/TLS
+Authentication: Yes (credentials in smtp_credentials.txt)
 ```
 
 ### PHP Example (PHPMailer)
@@ -77,19 +79,22 @@ Authentication: None
 $mail = new PHPMailer(true);
 $mail->isSMTP();
 $mail->Host = 'mail.100to1shot.com';
-$mail->Port = 25;
-$mail->SMTPAuth = false;
-$mail->SMTPSecure = false;
+$mail->Port = 587;
+$mail->SMTPAuth = true;
+$mail->SMTPSecure = 'tls';
+$mail->Username = 'smtpuser';  // Check smtp_credentials.txt
+$mail->Password = 'your_password';  // Check smtp_credentials.txt
 ```
 
 ### Node.js Example (Nodemailer)
 ```javascript
 const transporter = nodemailer.createTransporter({
     host: 'mail.100to1shot.com',
-    port: 25,
-    secure: false,
+    port: 587,
+    secure: false, // true for 465, false for other ports
     auth: {
-        // No authentication needed for local SMTP
+        user: 'smtpuser',  // Check smtp_credentials.txt
+        pass: 'your_password'  // Check smtp_credentials.txt
     }
 });
 ```
@@ -107,6 +112,7 @@ The script will generate a `DNS_SETUP_INSTRUCTIONS.txt` file with all the DNS re
 
 - `setup_postfix_mail.sh` - Main setup script
 - `test_mail.sh` - Test script (created after setup)
+- `smtp_credentials.txt` - SMTP authentication credentials
 - `DNS_SETUP_INSTRUCTIONS.txt` - DNS configuration guide
 - `/var/log/postfix_setup.log` - Setup log file
 
@@ -135,11 +141,13 @@ sudo mailq
 
 ## Security Notes
 
-- This setup is configured for **send-only** email functionality
-- SMTP ports are not exposed to the internet (send-only)
-- Firewall is configured to block unnecessary ports
+- This setup is configured for **send-only** email functionality with SSL/TLS
+- SMTP ports (25, 465, 587) are properly configured with encryption
+- SASL authentication required for sending emails
+- Firewall is configured with proper mail port rules
 - Fail2ban protects against brute force attacks
 - DKIM authentication prevents email spoofing
+- SSL/TLS certificates provide encrypted communication
 
 ## Requirements
 
