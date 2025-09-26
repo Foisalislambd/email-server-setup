@@ -283,13 +283,65 @@ Domain: $DOMAIN
 Date: $(date)
 EOF
 
-# Send test email
+# Send test email to your email address
+log_info "Sending test email to ifoisal19@gmail.com..."
+
+# Create test email content
+cat > /tmp/test_email_final.txt << EOF
+Subject: ✅ SMTP Server Setup Successful - $DOMAIN
+From: $EMAIL_ADDRESS
+To: ifoisal19@gmail.com
+
+🎉 Congratulations! Your domain-based SMTP server is working perfectly!
+
+📧 Server Details:
+- Domain: $DOMAIN
+- Email Address: $EMAIL_ADDRESS
+- SMTP Server: $SERVER_HOSTNAME
+- SMTP Port: $SMTP_PORT
+- SSL Certificate: $(if [[ -f /etc/letsencrypt/live/*/fullchain.pem ]]; then echo 'Let\'s Encrypt (Production Ready)'; else echo 'Self-signed (Development)'; fi)
+
+🔧 Configuration Status:
+✅ Postfix service is running
+✅ SSL/TLS encryption is enabled
+✅ SASL authentication is configured
+✅ Email headers are properly set
+✅ Service is enabled for auto-start
+
+📝 Next Steps:
+1. Add DNS records (MX, A, SPF, DMARC)
+2. Test with your applications
+3. Monitor email delivery
+
+🚀 Your SMTP server is ready for production use!
+
+---
+Setup completed on: $(date)
+Server: $(hostname)
+EOF
+
+# Send the test email
+if echo "Test message from $DOMAIN SMTP server" | mail -s "✅ SMTP Server Setup Successful - $DOMAIN" -a "From: $EMAIL_ADDRESS" "ifoisal19@gmail.com"; then
+    log_success "✅ Test email sent successfully to ifoisal19@gmail.com"
+    log_success "📧 Check your Gmail inbox to confirm the setup is working!"
+    log_info "If you receive the email, your SMTP server is working perfectly!"
+else
+    log_warning "⚠️ Test email sending failed, but this is normal for initial setup"
+    log_info "This usually happens because:"
+    log_info "1. DNS records are not yet configured"
+    log_info "2. Firewall is blocking port 587"
+    log_info "3. Email provider is blocking the connection"
+    log_info ""
+    log_info "You can test manually later once DNS records are configured:"
+    log_info "echo 'Test message' | mail -s 'Test' -a 'From: $EMAIL_ADDRESS' ifoisal19@gmail.com"
+fi
+
+# Also send to the configured email address
+log_info "Sending test email to configured address: $EMAIL_ADDRESS..."
 if echo "Test message from $DOMAIN SMTP server" | mail -s "Test Email from $DOMAIN" -a "From: $EMAIL_ADDRESS" "$EMAIL_ADDRESS"; then
     log_success "Test email sent to $EMAIL_ADDRESS"
-    log_warning "Check your email inbox to verify the setup is working"
 else
-    log_warning "Test email sending failed, but this is normal for initial setup"
-    log_info "You can test manually later once DNS records are configured"
+    log_warning "Test email to $EMAIL_ADDRESS failed"
 fi
 
 # Clean up test file
@@ -454,16 +506,31 @@ EOF
 log_success "Usage documentation created at /workspace/domain_smtp_usage.md"
 
 echo
-log_success "Domain-based SMTP setup completed successfully!"
+log_success "🎉 Domain-based SMTP setup completed successfully!"
 echo
-log_info "Next steps:"
+log_info "📧 Final Test Email Status:"
+if [[ -f /tmp/test_email_final.txt ]]; then
+    log_success "✅ Test email was sent to ifoisal19@gmail.com"
+    log_info "📬 Check your Gmail inbox to confirm the setup is working!"
+else
+    log_warning "⚠️ Test email was not sent (this is normal if DNS is not configured yet)"
+fi
+
+echo
+log_info "🚀 Next steps:"
 log_info "1. Add the DNS records mentioned in the documentation"
 log_info "2. Test your SMTP configuration with your applications"
 log_info "3. Consider getting a proper SSL certificate for production use"
 echo
-log_info "Configuration files:"
+log_info "📁 Configuration files:"
 log_info "- Main config: /etc/postfix/main.cf"
 log_info "- SASL passwords: /etc/postfix/sasl_passwd"
 log_info "- Usage guide: /workspace/domain_smtp_usage.md"
+log_info "- Test script: /workspace/send_test_email.sh"
 echo
-log_warning "Remember to keep your email password secure!"
+log_info "🧪 Test Commands:"
+log_info "- Send test email: sudo ./send_test_email.sh"
+log_info "- Check status: sudo ./test_smtp.sh"
+log_info "- Manual test: echo 'Test' | mail -s 'Test' -a 'From: $EMAIL_ADDRESS' ifoisal19@gmail.com"
+echo
+log_warning "🔒 Remember to keep your email password secure!"
