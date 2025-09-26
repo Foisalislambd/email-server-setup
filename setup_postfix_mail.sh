@@ -225,46 +225,32 @@ configure_postfix_main() {
     print_success "Postfix main configuration completed"
 }
 
-# Function to configure SASL authentication
+# Function to configure SASL authentication for local users
 configure_sasl() {
-    print_status "Configuring SASL authentication..."
-    log_message "Setting up SASL authentication"
+    print_status "Configuring SASL authentication for local users..."
+    log_message "Setting up SASL authentication for standalone mail server"
     
     # Install SASL packages
     if command -v apt-get &> /dev/null; then
         apt-get install -y sasl2-bin libsasl2-modules
     fi
     
-    # Configure SASL
+    # Configure SASL for local authentication
     cat > /etc/postfix/sasl/smtpd.conf << EOF
 pwcheck_method: auxprop
 auxprop_plugin: sasldb
 mech_list: PLAIN LOGIN CRAM-MD5 DIGEST-MD5 NTLM
 EOF
     
-    # Create SASL password database
-    if [[ ! -f /etc/postfix/sasl_passwd ]]; then
-        print_status "Creating SASL password file..."
-        echo "# SMTP relay credentials (replace with your actual credentials)" > /etc/postfix/sasl_passwd
-        echo "# [smtp.gmail.com]:587 username:password" >> /etc/postfix/sasl_passwd
-        echo "# [smtp.mailgun.org]:587 username:password" >> /etc/postfix/sasl_passwd
-    fi
+    # Configure Postfix for SASL (for local user authentication)
+    postconf -e "smtpd_sasl_auth_enable = yes"
+    postconf -e "smtpd_sasl_type = cyrus"
+    postconf -e "smtpd_sasl_path = smtpd"
+    postconf -e "smtpd_sasl_security_options = noanonymous"
+    postconf -e "smtpd_sasl_local_domain = $DOMAIN"
+    postconf -e "broken_sasl_auth_clients = yes"
     
-    # Set permissions
-    chmod 600 /etc/postfix/sasl_passwd
-    chown root:postfix /etc/postfix/sasl_passwd
-    
-    # Create hash database
-    postmap /etc/postfix/sasl_passwd
-    
-    # Configure Postfix for SASL
-    postconf -e "smtp_sasl_auth_enable = yes"
-    postconf -e "smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd"
-    postconf -e "smtp_sasl_security_options = noanonymous"
-    postconf -e "smtp_sasl_tls_security_options = noanonymous"
-    postconf -e "smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt"
-    
-    print_success "SASL authentication configured"
+    print_success "SASL authentication configured for local users"
 }
 
 # Function to configure master.cf for submission port
@@ -275,20 +261,20 @@ configure_master() {
     # Backup original master.cf
     cp /etc/postfix/master.cf /etc/postfix/master.cf.backup.$(date +%Y%m%d_%H%M%S)
     
-    # Add submission service configuration
+    # Add submission service configuration for standalone mail server
     if ! grep -q "^submission" /etc/postfix/master.cf; then
         cat >> /etc/postfix/master.cf << EOF
 
-# Submission port (587) with SASL authentication
+# Submission port (587) for standalone mail server
 submission inet n       -       y       -       -       smtpd
   -o syslog_name=postfix/submission
   -o smtpd_tls_security_level=encrypt
   -o smtpd_sasl_auth_enable=yes
   -o smtpd_reject_unlisted_recipient=no
-  -o smtpd_client_restrictions=permit_sasl_authenticated,reject
+  -o smtpd_client_restrictions=permit_sasl_authenticated,permit_mynetworks,reject
   -o milter_macro_daemon_name=ORIGINATING
-  -o smtpd_sasl_type=dovecot
-  -o smtpd_sasl_path=private/auth
+  -o smtpd_sasl_type=cyrus
+  -o smtpd_sasl_path=smtpd
   -o smtpd_sasl_security_options=noanonymous
   -o smtpd_sasl_local_domain=$DOMAIN
   -o smtpd_recipient_restrictions=permit_sasl_authenticated,permit_mynetworks,reject_unauth_destination
@@ -458,12 +444,10 @@ SERVICES:
 - Firewall: $(systemctl is-active ufw 2>/dev/null || systemctl is-active firewalld 2>/dev/null || echo "Not configured")
 
 NEXT STEPS:
-1. Configure your SMTP relay credentials in /etc/postfix/sasl_passwd
-2. Update the file with your actual SMTP provider details:
-   [smtp.gmail.com]:587 your-email@gmail.com:your-app-password
-3. Run: postmap /etc/postfix/sasl_passwd
-4. Restart Postfix: systemctl restart postfix
-5. Test email sending from your website
+1. Configure DNS records (A, PTR, SPF, DKIM, DMARC)
+2. Create local user accounts for email authentication
+3. Test email sending from your website
+4. Monitor mail logs for delivery status
 
 DNS RECORDS REQUIRED:
 - A record: mail.100to1shot.com -> YOUR_SERVER_IP
@@ -476,8 +460,10 @@ WEBSITE INTEGRATION:
 For your website to send emails, use these SMTP settings:
 - SMTP Server: mail.100to1shot.com
 - Port: 587 (with TLS) or 465 (with SSL)
-- Authentication: Required (configure in sasl_passwd)
+- Authentication: Required (use local system user credentials)
 - From Address: noreply@100to1shot.com
+- Username: local system username
+- Password: local system user password
 
 LOGS:
 - Mail logs: /var/log/mail.log
@@ -496,17 +482,16 @@ display_final_instructions() {
     echo
     print_status "IMPORTANT: Complete these steps to finish the setup:"
     echo
-    echo "1. Configure SMTP relay credentials:"
-    echo "   nano /etc/postfix/sasl_passwd"
-    echo "   Add your SMTP provider credentials (Gmail, Mailgun, etc.)"
+    echo "1. Create local user accounts for email authentication:"
+    echo "   useradd -m -s /bin/bash mailuser"
+    echo "   passwd mailuser"
     echo
-    echo "2. Update the password database:"
-    echo "   postmap /etc/postfix/sasl_passwd"
-    echo "   systemctl restart postfix"
+    echo "2. Configure DNS records for $SUBDOMAIN:"
+    echo "   - A record: mail.100to1shot.com -> YOUR_SERVER_IP"
+    echo "   - PTR record: YOUR_SERVER_IP -> mail.100to1shot.com"
+    echo "   - SPF, DKIM, DMARC records"
     echo
-    echo "3. Configure DNS records for $SUBDOMAIN"
-    echo
-    echo "4. Test email sending from your website"
+    echo "3. Test email sending from your website using local user credentials"
     echo
     print_status "Configuration summary saved to /root/postfix_setup_summary.txt"
     print_status "Setup logs saved to $LOG_FILE"

@@ -1,6 +1,6 @@
-# Postfix Mail System Setup for mail.100to1shot.com
+# Standalone Postfix Mail System Setup for mail.100to1shot.com
 
-This repository contains automated scripts to set up a complete Postfix mail system for your subdomain `mail.100to1shot.com`, enabling SMTP functionality for your website to send emails to users.
+This repository contains automated scripts to set up a complete standalone Postfix mail system for your subdomain `mail.100to1shot.com`, enabling SMTP functionality for your website to send emails directly without relying on external providers.
 
 ## 🚀 Quick Start
 
@@ -9,7 +9,7 @@ This repository contains automated scripts to set up a complete Postfix mail sys
 - Ubuntu/Debian server with root access
 - Domain `100to1shot.com` with subdomain `mail.100to1shot.com`
 - DNS access to configure required records
-- SMTP relay provider credentials (Gmail, Mailgun, etc.)
+- No external SMTP providers needed - this is a standalone mail server
 
 ### Installation
 
@@ -18,9 +18,14 @@ This repository contains automated scripts to set up a complete Postfix mail sys
    sudo ./setup_postfix_mail.sh
    ```
 
-2. **Configure SMTP relay (required for sending emails):**
+2. **Create mail users for authentication:**
    ```bash
-   sudo ./configure_smtp_relay.sh
+   sudo ./manage_mail_users.sh
+   ```
+
+3. **Validate DNS configuration:**
+   ```bash
+   sudo ./validate_dns_setup.sh
    ```
 
 ## 📋 What the Scripts Do
@@ -42,15 +47,27 @@ The main script automatically:
 - ✅ Tests mail configuration
 - ✅ Creates detailed setup summary
 
-### SMTP Relay Configuration Script (`configure_smtp_relay.sh`)
+### Mail User Management Script (`manage_mail_users.sh`)
 
 The companion script provides:
 
-- 🔧 Interactive SMTP provider selection
-- 🔧 Credential configuration for popular providers
-- 🔧 SMTP relay testing
-- 🔧 Configuration management
-- 🔧 Easy removal of relay settings
+- 👤 Create and manage local mail users
+- 🔐 Password management for mail users
+- 🔍 List and monitor mail users
+- 🧪 Test mail authentication
+- 📊 Show mail server statistics
+- ⚙️ Configure mail aliases
+
+### DNS Validation Script (`validate_dns_setup.sh`)
+
+The validation script provides:
+
+- 🌐 Validate DNS records (A, PTR, SPF, MX)
+- 🔌 Test SMTP connectivity and ports
+- 🔒 Test TLS/SSL configuration
+- 📧 Send test emails
+- 📋 Generate DNS configuration recommendations
+- 📊 Check mail server logs
 
 ## 🌐 DNS Configuration Required
 
@@ -79,17 +96,15 @@ Configure with your SMTP provider (Gmail, Mailgun, etc.)
 _dmarc.100to1shot.com    TXT    "v=DMARC1; p=quarantine; rua=mailto:admin@100to1shot.com"
 ```
 
-## 📧 SMTP Providers Supported
+## 👤 Mail User Management
 
-The configuration script supports:
+This standalone mail server uses local system users for authentication:
 
-1. **Gmail** - Requires App Password (2FA must be enabled)
-2. **Outlook/Hotmail** - Standard authentication
-3. **Yahoo** - Standard authentication
-4. **Mailgun** - API-based authentication
-5. **SendGrid** - API-based authentication
-6. **Amazon SES** - AWS credentials
-7. **Custom SMTP** - Any SMTP server
+1. **Create Mail Users** - Use the management script to create dedicated mail users
+2. **Local Authentication** - No external providers needed
+3. **Secure Passwords** - Use strong passwords for mail users
+4. **User Management** - Easy creation, deletion, and password management
+5. **Mail Aliases** - Configure email aliases for different purposes
 
 ## 🔧 Website Integration
 
@@ -99,8 +114,8 @@ For your website to send emails, use these SMTP settings:
 SMTP Server: mail.100to1shot.com
 Port: 587 (with TLS) or 465 (with SSL)
 Authentication: Required
-Username: Your configured email address
-Password: Your configured password/app password
+Username: Local system username (created with manage_mail_users.sh)
+Password: Local system user password
 From Address: noreply@100to1shot.com
 ```
 
@@ -128,8 +143,8 @@ const transporter = nodemailer.createTransporter({
     port: 587,
     secure: false, // true for 465, false for other ports
     auth: {
-        user: 'your-email@100to1shot.com',
-        pass: 'your-password'
+        user: 'your-mail-username', // Local system username
+        pass: 'your-mail-password'  // Local system user password
     }
 });
 
@@ -175,15 +190,16 @@ mailq
 ### Common Issues
 
 1. **Emails going to spam**: Configure SPF, DKIM, and DMARC records
-2. **Authentication failed**: Check SMTP credentials in `/etc/postfix/sasl_passwd`
+2. **Authentication failed**: Check local user credentials and SASL configuration
 3. **Connection refused**: Ensure firewall allows ports 25, 587, 465
 4. **DNS issues**: Verify A and PTR records are correctly configured
+5. **User not found**: Create mail users using `manage_mail_users.sh`
 
 ## 📁 Important Files
 
 - `/etc/postfix/main.cf` - Main Postfix configuration
 - `/etc/postfix/master.cf` - Service configuration
-- `/etc/postfix/sasl_passwd` - SMTP relay credentials
+- `/etc/postfix/sasl/smtpd.conf` - SASL authentication configuration
 - `/etc/postfix/aliases` - Mail aliases
 - `/etc/ssl/postfix/mail.crt` - SSL certificate
 - `/etc/ssl/postfix/mail.key` - SSL private key
@@ -193,12 +209,13 @@ mailq
 ## 🔒 Security Features
 
 - ✅ TLS/SSL encryption for email transmission
-- ✅ SASL authentication for SMTP relay
+- ✅ SASL authentication for local users
 - ✅ Firewall configuration for required ports only
-- ✅ Secure file permissions (600 for credentials)
+- ✅ Secure file permissions for configuration files
 - ✅ Disabled VRFY command
 - ✅ Helo restrictions
 - ✅ Message size limits
+- ✅ Standalone operation (no external dependencies)
 
 ## 📞 Support
 
@@ -214,12 +231,14 @@ If you encounter issues:
 
 After successful setup:
 
-1. Configure your website to use the SMTP settings
-2. Test email sending from your application
-3. Monitor mail logs for any issues
-4. Consider setting up email monitoring
-5. Implement proper email templates for your website
+1. Create mail users using `manage_mail_users.sh`
+2. Configure DNS records as recommended by `validate_dns_setup.sh`
+3. Configure your website to use the SMTP settings
+4. Test email sending from your application
+5. Monitor mail logs for any issues
+6. Consider setting up email monitoring
+7. Implement proper email templates for your website
 
 ---
 
-**Note**: This setup creates a send-only mail server. For receiving emails, additional configuration would be required including IMAP/POP3 setup and proper MX records.
+**Note**: This setup creates a standalone mail server that can send emails directly without external providers. For receiving emails, additional configuration would be required including IMAP/POP3 setup and proper MX records.
